@@ -1,0 +1,330 @@
+/* ═══════════════════════════════════════
+   main.css — PZ Texture Editor
+   Theme: Dark Industrial / Post-Apocalyptic
+═══════════════════════════════════════ */
+
+/* ── DESIGN TOKENS ─────────────────── */
+:root {
+  /* Base palette */
+  --bg-root:        #0a0b0a;
+  --bg-dark:        #101210;
+  --bg-panel:       #161816;
+  --bg-panel-alt:   #1c1f1c;
+  --bg-hover:       #232623;
+  --bg-input:       #141614;
+  --bg-selected:    #1f2b14;
+
+  /* Borders */
+  --border:         #252825;
+  --border-mid:     #2e332e;
+  --border-light:   #3a403a;
+
+  /* Text */
+  --text-hi:        #dde3dd;
+  --text-mid:       #8e968e;
+  --text-lo:        #4d554d;
+
+  /* Accent — military olive-green */
+  --accent:         #7aab45;
+  --accent-dark:    #537830;
+  --accent-muted:   #4a6b2a;
+  --accent-bright:  #9fd463;
+  --accent-glow:    rgba(122, 171, 69, 0.18);
+
+  /* Danger */
+  --danger:         #b84444;
+  --danger-hi:      #e05555;
+
+  /* Warning */
+  --warn:           #b89444;
+
+  /* Fonts */
+  --font-mono:      'Share Tech Mono', 'Courier New', monospace;
+  --font-ui:        'Barlow', system-ui, sans-serif;
+  --font-cond:      'Barlow Condensed', 'Barlow', sans-serif;
+
+  /* Layout */
+  --toolbar-h:      48px;
+  --tool-panel-w:   224px;
+  --right-panel-w:  272px;
+  --statusbar-h:    26px;
+
+  /* Radius */
+  --radius-sm:      2px;
+  --radius:         4px;
+
+  /* Transition */
+  --transition:     0.12s ease;
+}
+
+/* ── RESET ──────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-root);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+select option { background: var(--bg-panel-alt); }
+
+/* ── SCROLLBAR ──────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb  { background: var(--border-mid); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dark); }
+
+/* ── WORKSPACE LAYOUT ───────────────── */
+#workspace {
+  display: flex;
+  height: calc(100vh - var(--toolbar-h));
+  overflow: hidden;
+}
+
+/* ── SHARED COMPONENTS ──────────────── */
+
+.hidden { display: none !important; }
+
+/* Panel header bar */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-dark);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-mid);
+  flex-shrink: 0;
+  user-select: none;
+}
+.panel-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* Icon button */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-mid);
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1;
+  transition: color var(--transition), background var(--transition);
+}
+.icon-btn:hover { color: var(--text-hi); background: var(--bg-hover); }
+.icon-btn.danger:hover { color: var(--danger-hi); }
+.icon-btn.active, .icon-btn[data-active="true"] {
+  color: var(--accent-bright);
+}
+
+/* Option label */
+.option-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-mid);
+  margin-top: 8px;
+  margin-bottom: 3px;
+}
+
+/* Value display */
+.val-display {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Slider */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  background: var(--border-mid);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: grab;
+  transition: background var(--transition), transform var(--transition);
+}
+.slider::-webkit-slider-thumb:hover { background: var(--accent-bright); transform: scale(1.2); }
+.slider::-webkit-slider-thumb:active { cursor: grabbing; }
+
+/* Select */
+.option-select {
+  background: var(--bg-input);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.option-select:focus { border-color: var(--accent-dark); }
+
+/* Text input */
+.option-input {
+  background: var(--bg-input);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.option-input:focus { border-color: var(--accent-dark); }
+
+/* Buttons */
+.option-btn {
+  background: var(--bg-panel-alt);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  width: 100%;
+  margin-top: 5px;
+  transition: background var(--transition), border-color var(--transition);
+}
+.option-btn:hover { background: var(--bg-hover); border-color: var(--border-light); }
+.option-btn:active { transform: scale(0.98); }
+.option-btn--accent {
+  background: var(--accent-muted);
+  border-color: var(--accent-dark);
+  color: var(--accent-bright);
+}
+.option-btn--accent:hover { background: var(--accent-dark); border-color: var(--accent); }
+
+/* Checkbox label */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-hi);
+  cursor: pointer;
+  margin-top: 7px;
+  user-select: none;
+}
+.checkbox-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Section header divider */
+.section-header {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-top: 14px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Hint text */
+.hint-text {
+  display: block;
+  font-size: 10px;
+  color: var(--text-lo);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* Style button row (bold/italic/underline etc.) */
+.style-buttons-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.style-btn {
+  background: var(--bg-panel-alt);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.style-btn:hover { color: var(--text-hi); background: var(--bg-hover); }
+.style-btn.active {
+  background: var(--accent-muted);
+  border-color: var(--accent-dark);
+  color: var(--accent-bright);
+}
+
+/* Spinner */
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-mid);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Checkerboard pattern (transparency indicator) */
+.checker-bg,
+#checker-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, #1e201e 25%, transparent 25%),
+    linear-gradient(-45deg, #1e201e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1e201e 75%),
+    linear-gradient(-45deg, transparent 75%, #1e201e 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  background-color: #141614;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Number input no spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+input[type=number] { -moz-appearance: textfield; }
