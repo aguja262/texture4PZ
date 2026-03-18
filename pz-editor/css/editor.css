@@ -1,0 +1,98 @@
+/* ═══════════════════════════════════════
+   editor.css — Canvas Editor Area
+═══════════════════════════════════════ */
+
+#canvas-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-root);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── CANVAS WRAPPER (scrollable viewport) ── */
+#canvas-wrapper {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: crosshair;
+}
+#canvas-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
+
+/* Container that scales with zoom */
+#canvas-container {
+  position: relative;
+  transform-origin: center center;
+  /* Shadow for canvas depth */
+  filter: drop-shadow(0 8px 32px rgba(0,0,0,0.7));
+  flex-shrink: 0;
+}
+
+/* Overlay canvas (grid, pixel grid, cursor preview) */
+#overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Fabric.js canvas element */
+#main-canvas {
+  display: block;
+  position: relative;
+  z-index: 5;
+}
+
+/* Fabric.js injects a wrapper div — make sure it doesn't add offset */
+#canvas-container .canvas-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 5;
+}
+
+/* ── CURSOR MODES ──────────────────── */
+#canvas-wrapper.tool-brush   { cursor: none; }
+#canvas-wrapper.tool-eraser  { cursor: none; }
+#canvas-wrapper.tool-fill    { cursor: crosshair; }
+#canvas-wrapper.tool-text    { cursor: text; }
+#canvas-wrapper.tool-eyedropper { cursor: cell; }
+#canvas-wrapper.tool-select  { cursor: default; }
+#canvas-wrapper.tool-crop    { cursor: crosshair; }
+
+/* ── STATUS BAR ────────────────────── */
+#canvas-statusbar {
+  display: flex;
+  align-items: center;
+  height: var(--statusbar-h);
+  background: var(--bg-dark);
+  border-top: 1px solid var(--border);
+  padding: 0 10px;
+  gap: 0;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-mid);
+  letter-spacing: 0.06em;
+}
+.status-item { padding: 0 8px; }
+.status-sep  { color: var(--border-mid); }
+
+#color-preview-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  margin-right: 5px;
+  vertical-align: middle;
+  background: #000;
+}
+#color-preview-hex { vertical-align: middle; }

@@ -1,0 +1,136 @@
+/* ═══════════════════════════════════════
+   tool-panel.css — Left Tool Panel
+═══════════════════════════════════════ */
+
+#tool-panel {
+  width: var(--tool-panel-w);
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* ── TOOL BUTTONS GRID ─────────────── */
+#tool-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+}
+.tool-btn svg {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+.tool-btn:hover {
+  color: var(--text-hi);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+.tool-btn.active {
+  color: var(--accent-bright);
+  background: var(--bg-selected);
+  border-color: var(--accent-dark);
+}
+
+/* ── TOOL OPTIONS ──────────────────── */
+#tool-options {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
+/* Color section */
+.color-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.color-stack {
+  position: relative;
+  width: 52px;
+  height: 42px;
+  flex-shrink: 0;
+}
+.color-swatch {
+  width: 36px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition);
+  position: absolute;
+}
+.color-swatch:hover { border-color: var(--text-mid); transform: scale(1.05); }
+.secondary-swatch {
+  bottom: 0;
+  right: 0;
+  background: white;
+  z-index: 1;
+}
+.primary-swatch {
+  top: 0;
+  left: 0;
+  background: black;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.color-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.color-action-btn {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-mid);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+.color-action-btn:hover { color: var(--text-hi); background: var(--bg-hover); }
+
+/* Tool option groups */
+.tool-option-group {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+}
+
+/* Filter section */
+.filter-section {
+  padding-top: 2px;
+}
+
+/* Number input in tool panel */
+#text-size, .cp-num {
+  width: 60px;
+}

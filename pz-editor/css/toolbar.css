@@ -1,0 +1,169 @@
+/* ═══════════════════════════════════════
+   toolbar.css — Top Toolbar
+═══════════════════════════════════════ */
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-h);
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  user-select: none;
+}
+#toolbar::-webkit-scrollbar { height: 0; }
+
+/* Brand */
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.brand-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.brand-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Toolbar groups */
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+/* Separator */
+.tb-separator {
+  width: 1px;
+  height: 22px;
+  background: var(--border-mid);
+  margin: 0 4px;
+}
+
+/* Toolbar label */
+.tb-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-mid);
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+}
+
+/* Toolbar select */
+.tb-select {
+  background: var(--bg-input);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  height: 28px;
+}
+.tb-select:focus { border-color: var(--accent-dark); }
+
+/* Toolbar buttons */
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  background: var(--bg-panel-alt);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+.tb-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.tb-btn:hover {
+  color: var(--text-hi);
+  background: var(--bg-hover);
+  border-color: var(--border-mid);
+}
+.tb-btn:active { transform: scale(0.97); }
+.tb-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.tb-btn:disabled:hover {
+  color: var(--text-mid);
+  background: var(--bg-panel-alt);
+  border-color: var(--border);
+  transform: none;
+}
+
+/* Icon-only toolbar button */
+.tb-btn.icon-only {
+  padding: 0 8px;
+  min-width: 28px;
+  font-size: 14px;
+  justify-content: center;
+  font-family: var(--font-ui);
+}
+
+/* Toggle button */
+.tb-btn.toggle-btn[data-active="true"],
+.tb-btn.toggle-btn.active {
+  background: var(--accent-muted);
+  border-color: var(--accent-dark);
+  color: var(--accent-bright);
+}
+
+/* Accent button */
+.tb-btn--accent {
+  background: var(--accent-muted);
+  border-color: var(--accent-dark);
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+.tb-btn--accent:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Zoom display */
+.zoom-display {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 42px;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive: hide labels on small screens */
+@media (max-width: 1200px) {
+  .tb-btn span { display: none; }
+  .tb-btn { padding: 0 8px; }
+  .brand-text { display: none; }
+}
