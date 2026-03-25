@@ -17,7 +17,8 @@
   {
     "imports": {
       "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/",
+      "@imgly/background-removal": "https://unpkg.com/@imgly/background-removal@1.4.14/dist/browser/index.js"
     }
   }
   </script>
@@ -349,12 +350,15 @@
       <!-- Clothing presets section -->
       <div id="presets-section">
         <div class="panel-header">
-          <span>PRENDAS</span>
-          <span id="preset-status" style="font-size:9px;color:var(--warn)"></span>
+          <span>PLANTILLA DE TEXTURA</span>
+          <span id="preset-status" style="font-size:9px;color:var(--accent)"></span>
         </div>
-        <div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg-dark)">
-          <select id="preset-select" class="option-select" style="font-size:11px">
-            <!-- Populated by clothingPresets.js -->
+        <div style="padding:5px 8px 6px;border-bottom:1px solid var(--border);background:var(--bg-dark);display:flex;flex-direction:column;gap:4px">
+          <select id="preset-category" class="option-select" style="font-size:11px">
+            <option value="">— Tipo de personaje —</option>
+          </select>
+          <select id="preset-variant" class="option-select" style="font-size:11px">
+            <option value="">— Variante —</option>
           </select>
         </div>
       </div>

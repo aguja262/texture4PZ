@@ -1,118 +1,98 @@
 /**
- * clothingPresets.js — Prendas predefinidas para Project Zomboid
- * Gestiona el panel de selección de prendas, cargando modelos FBX y plantillas UV.
+ * clothingPresets.js — Selector de plantillas de textura de PZ
+ *
+ * Organiza las texturas en 4 categorías:
+ *   - Hombre humano  (MaleBody01 … MaleBody05, variantes 'a')
+ *   - Mujer humana   (FemaleBody01)
+ *   - Hombre zombie  (M_ZedBody01-04, niveles 0-3)
+ *   - Mujer zombie   (F_ZedBody01-04, niveles 0-3)
+ *
+ * Al seleccionar una variante:
+ *   1. Carga la textura como capa de plantilla (referencia UV, bloqueada)
+ *   2. Ajusta el canvas a 256×256 (tamaño nativo de las texturas PZ)
+ *   3. Carga automáticamente el modelo FBX correspondiente al género activo
+ *   4. Aplica la textura al modelo 3D para ver la referencia en el visor
  */
 
-import { bus } from './app.js';
+import { bus, APP } from './app.js';
 
-// Definición de prendas. Los archivos se añadirán en assets/models y assets/templates.
-export const PRESETS = [
+// Modelos FBX por género (rutas relativas al proyecto)
+const MODELS = {
+  male:   'assets/models/male_body.fbx',
+  female: 'assets/models/female_body.fbx',
+};
+
+// Estructura de texturas
+const CATEGORIES = [
   {
-    id:       'none',
-    name:     '— Sin prenda seleccionada —',
-    models:   { female: null, male: null },
-    template: null,
-    size:     1024,
+    id:     'male',
+    label:  '♂ Hombre humano',
+    gender: 'male',
+    variants: [
+      { id: 'MaleBody01',  label: 'Cuerpo 01',          file: 'assets/templates/male/MaleBody01.png' },
+      { id: 'MaleBody01a', label: 'Cuerpo 01 (alt)',     file: 'assets/templates/male/MaleBody01a.png' },
+      { id: 'MaleBody02',  label: 'Cuerpo 02',          file: 'assets/templates/male/MaleBody02.png' },
+      { id: 'MaleBody02a', label: 'Cuerpo 02 (alt)',     file: 'assets/templates/male/MaleBody02a.png' },
+      { id: 'MaleBody03',  label: 'Cuerpo 03',          file: 'assets/templates/male/MaleBody03.png' },
+      { id: 'MaleBody03a', label: 'Cuerpo 03 (alt)',     file: 'assets/templates/male/MaleBody03a.png' },
+      { id: 'MaleBody04',  label: 'Cuerpo 04',          file: 'assets/templates/male/MaleBody04.png' },
+      { id: 'MaleBody04a', label: 'Cuerpo 04 (alt)',     file: 'assets/templates/male/MaleBody04a.png' },
+      { id: 'MaleBody05',  label: 'Cuerpo 05',          file: 'assets/templates/male/MaleBody05.png' },
+      { id: 'MaleBody05a', label: 'Cuerpo 05 (alt)',     file: 'assets/templates/male/MaleBody05a.png' },
+    ],
   },
   {
-    id:       'tshirt',
-    name:     'Camiseta',
-    models:   {
-      female: 'assets/models/tshirt_female.fbx',
-      male:   'assets/models/tshirt_male.fbx',
-    },
-    template: 'assets/templates/tshirt_template.png',
-    size:     1024,
+    id:     'female',
+    label:  '♀ Mujer humana',
+    gender: 'female',
+    variants: [
+      { id: 'FemaleBody01', label: 'Cuerpo 01', file: 'assets/templates/female/FemaleBody01.png' },
+    ],
   },
   {
-    id:       'shirt',
-    name:     'Camisa larga',
-    models:   {
-      female: 'assets/models/shirt_female.fbx',
-      male:   'assets/models/shirt_male.fbx',
-    },
-    template: 'assets/templates/shirt_template.png',
-    size:     1024,
+    id:     'malezombie',
+    label:  '♂ Hombre zombie',
+    gender: 'male',
+    variants: [
+      { id: 'M_ZedBody01',       label: 'Zed 01',          file: 'assets/templates/malezombie/M_ZedBody01.png' },
+      { id: 'M_ZedBody01_lv1',   label: 'Zed 01 — Nivel 1', file: 'assets/templates/malezombie/M_ZedBody01_level1.png' },
+      { id: 'M_ZedBody01_lv2',   label: 'Zed 01 — Nivel 2', file: 'assets/templates/malezombie/M_ZedBody01_level2.png' },
+      { id: 'M_ZedBody01_lv3',   label: 'Zed 01 — Nivel 3', file: 'assets/templates/malezombie/M_ZedBody01_level3.png' },
+      { id: 'M_ZedBody02',       label: 'Zed 02',          file: 'assets/templates/malezombie/M_ZedBody02.png' },
+      { id: 'M_ZedBody02_lv1',   label: 'Zed 02 — Nivel 1', file: 'assets/templates/malezombie/M_ZedBody02_level1.png' },
+      { id: 'M_ZedBody02_lv2',   label: 'Zed 02 — Nivel 2', file: 'assets/templates/malezombie/M_ZedBody02_level2.png' },
+      { id: 'M_ZedBody02_lv3',   label: 'Zed 02 — Nivel 3', file: 'assets/templates/malezombie/M_ZedBody02_level3.png' },
+      { id: 'M_ZedBody03',       label: 'Zed 03',          file: 'assets/templates/malezombie/M_ZedBody03.png' },
+      { id: 'M_ZedBody03_lv1',   label: 'Zed 03 — Nivel 1', file: 'assets/templates/malezombie/M_ZedBody03_level1.png' },
+      { id: 'M_ZedBody03_lv2',   label: 'Zed 03 — Nivel 2', file: 'assets/templates/malezombie/M_ZedBody03_level2.png' },
+      { id: 'M_ZedBody03_lv3',   label: 'Zed 03 — Nivel 3', file: 'assets/templates/malezombie/M_ZedBody03_level3.png' },
+      { id: 'M_ZedBody04',       label: 'Zed 04',          file: 'assets/templates/malezombie/M_ZedBody04.png' },
+      { id: 'M_ZedBody04_lv1',   label: 'Zed 04 — Nivel 1', file: 'assets/templates/malezombie/M_ZedBody04_level1.png' },
+      { id: 'M_ZedBody04_lv2',   label: 'Zed 04 — Nivel 2', file: 'assets/templates/malezombie/M_ZedBody04_level2.png' },
+    ],
   },
   {
-    id:       'jacket',
-    name:     'Chaqueta / Cazadora',
-    models:   {
-      female: 'assets/models/jacket_female.fbx',
-      male:   'assets/models/jacket_male.fbx',
-    },
-    template: 'assets/templates/jacket_template.png',
-    size:     1024,
-  },
-  {
-    id:       'hoodie',
-    name:     'Sudadera con capucha',
-    models:   {
-      female: 'assets/models/hoodie_female.fbx',
-      male:   'assets/models/hoodie_male.fbx',
-    },
-    template: 'assets/templates/hoodie_template.png',
-    size:     1024,
-  },
-  {
-    id:       'pants',
-    name:     'Pantalón',
-    models:   {
-      female: 'assets/models/pants_female.fbx',
-      male:   'assets/models/pants_male.fbx',
-    },
-    template: 'assets/templates/pants_template.png',
-    size:     1024,
-  },
-  {
-    id:       'shorts',
-    name:     'Pantalón corto',
-    models:   {
-      female: 'assets/models/shorts_female.fbx',
-      male:   'assets/models/shorts_male.fbx',
-    },
-    template: 'assets/templates/shorts_template.png',
-    size:     1024,
-  },
-  {
-    id:       'boots',
-    name:     'Botas',
-    models:   {
-      female: 'assets/models/boots_female.fbx',
-      male:   'assets/models/boots_male.fbx',
-    },
-    template: 'assets/templates/boots_template.png',
-    size:     512,
-  },
-  {
-    id:       'shoes',
-    name:     'Zapatos / Zapatillas',
-    models:   {
-      female: 'assets/models/shoes_female.fbx',
-      male:   'assets/models/shoes_male.fbx',
-    },
-    template: 'assets/templates/shoes_template.png',
-    size:     512,
-  },
-  {
-    id:       'hat',
-    name:     'Sombrero / Gorro',
-    models:   {
-      female: 'assets/models/hat_female.fbx',
-      male:   'assets/models/hat_male.fbx',
-    },
-    template: 'assets/templates/hat_template.png',
-    size:     512,
-  },
-  {
-    id:       'backpack',
-    name:     'Mochila',
-    models:   {
-      female: 'assets/models/backpack_female.fbx',
-      male:   'assets/models/backpack_male.fbx',
-    },
-    template: 'assets/templates/backpack_template.png',
-    size:     1024,
+    id:     'femalezombie',
+    label:  '♀ Mujer zombie',
+    gender: 'female',
+    variants: [
+      { id: 'F_ZedBody01',       label: 'Zed 01',           file: 'assets/templates/femalezombie/F_ZedBody01.png' },
+      { id: 'F_ZedBody01_lv1',   label: 'Zed 01 — Nivel 1', file: 'assets/templates/femalezombie/F_ZedBody01_level1.png' },
+      { id: 'F_ZedBody01_lv2',   label: 'Zed 01 — Nivel 2', file: 'assets/templates/femalezombie/F_ZedBody01_level2.png' },
+      { id: 'F_ZedBody01_lv3',   label: 'Zed 01 — Nivel 3', file: 'assets/templates/femalezombie/F_ZedBody01_level3.png' },
+      { id: 'F_ZedBody02',       label: 'Zed 02',           file: 'assets/templates/femalezombie/F_ZedBody02.png' },
+      { id: 'F_ZedBody02_lv1',   label: 'Zed 02 — Nivel 1', file: 'assets/templates/femalezombie/F_ZedBody02_level1.png' },
+      { id: 'F_ZedBody02_lv2',   label: 'Zed 02 — Nivel 2', file: 'assets/templates/femalezombie/F_ZedBody02_level2.png' },
+      { id: 'F_ZedBody02_lv3',   label: 'Zed 02 — Nivel 3', file: 'assets/templates/femalezombie/F_ZedBody02_level3.png' },
+      { id: 'F_ZedBody03',       label: 'Zed 03',           file: 'assets/templates/femalezombie/F_ZedBody03.png' },
+      { id: 'F_ZedBody03_lv1',   label: 'Zed 03 — Nivel 1', file: 'assets/templates/femalezombie/F_ZedBody03_level1.png' },
+      { id: 'F_ZedBody03_lv2',   label: 'Zed 03 — Nivel 2', file: 'assets/templates/femalezombie/F_ZedBody03_level2.png' },
+      { id: 'F_ZedBody03_lv3',   label: 'Zed 03 — Nivel 3', file: 'assets/templates/femalezombie/F_ZedBody03_level3.png' },
+      { id: 'F_ZedBody04',       label: 'Zed 04',           file: 'assets/templates/femalezombie/F_ZedBody04.png' },
+      { id: 'F_ZedBody04_lv1',   label: 'Zed 04 — Nivel 1', file: 'assets/templates/femalezombie/F_ZedBody04_level1.png' },
+      { id: 'F_ZedBody04_lv2',   label: 'Zed 04 — Nivel 2', file: 'assets/templates/femalezombie/F_ZedBody04_level2.png' },
+      { id: 'F_ZedBody04_lv3',   label: 'Zed 04 — Nivel 3', file: 'assets/templates/femalezombie/F_ZedBody04_level3.png' },
+    ],
   },
 ];
 
@@ -123,122 +103,210 @@ export class ClothingPresets {
     this._preview     = preview;
     this._fileManager = fileManager;
     this._app         = appState;
-    this._current     = null;
+
+    this._currentCategory = null;
+    this._currentVariant  = null;
+
+    // Cache de modelos ya cargados (evita recargas)
+    this._loadedModels = new Set();
 
     this._buildUI();
+    // Cargar modelos body al arrancar
+    this._autoLoadBothModels();
   }
 
-  /* ── Construir panel de selección ─────────────────── */
+  /* ── Construir la UI del panel ────────────────────── */
 
   _buildUI() {
-    const select = document.getElementById('preset-select');
-    if (!select) return;
+    const catSel     = document.getElementById('preset-category');
+    const variantSel = document.getElementById('preset-variant');
+    if (!catSel || !variantSel) return;
 
-    PRESETS.forEach(p => {
+    // Rellenar categorías
+    CATEGORIES.forEach(cat => {
       const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      select.appendChild(opt);
+      opt.value       = cat.id;
+      opt.textContent = cat.label;
+      catSel.appendChild(opt);
     });
 
-    select.addEventListener('change', e => this._applyPreset(e.target.value));
+    // Cambio de categoría → actualizar variantes
+    catSel.addEventListener('change', () => {
+      this._populateVariants(catSel.value);
+      // Al cambiar categoría, selecciona automáticamente la primera variante
+      const first = variantSel.options[1]; // skip the "-- sin selección --"
+      if (first) { variantSel.value = first.value; this._applyVariant(catSel.value, first.value); }
+    });
+
+    // Cambio de variante → cargar textura
+    variantSel.addEventListener('change', () => {
+      if (variantSel.value) this._applyVariant(catSel.value, variantSel.value);
+    });
   }
 
-  /* ── Aplicar prenda seleccionada ──────────────────── */
+  _populateVariants(catId) {
+    const variantSel = document.getElementById('preset-variant');
+    variantSel.innerHTML = '<option value="">— Variante —</option>';
 
-  async _applyPreset(id) {
-    const preset = PRESETS.find(p => p.id === id);
-    if (!preset || id === 'none') { this._current = null; return; }
+    const cat = CATEGORIES.find(c => c.id === catId);
+    if (!cat) return;
 
-    this._current = preset;
+    cat.variants.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value       = v.id;
+      opt.textContent = v.label;
+      variantSel.appendChild(opt);
+    });
+  }
+
+  /* ── Aplicar variante seleccionada ───────────────── */
+
+  async _applyVariant(catId, variantId) {
+    const cat     = CATEGORIES.find(c => c.id === catId);
+    if (!cat) return;
+    const variant = cat.variants.find(v => v.id === variantId);
+    if (!variant) return;
+
+    this._currentCategory = cat;
+    this._currentVariant  = variant;
 
     const status = document.getElementById('preset-status');
-    if (status) status.textContent = '';
 
-    // 1. Cargar plantilla UV (si existe)
-    if (preset.template) {
-      await this._loadTemplateFromPath(preset.template, preset);
+    // 1. Ajustar canvas a 256×256 (tamaño nativo PZ)
+    if (this._app.canvasW !== 256 || this._app.canvasH !== 256) {
+      if (confirm('Las texturas de PZ son 256×256. ¿Ajustar el canvas automáticamente?')) {
+        this._app.canvasW = 256;
+        this._app.canvasH = 256;
+        this._editor.resize(256, 256, true);
+        this._layers.init();
+        document.getElementById('canvas-dims').textContent = '256 × 256';
+        document.getElementById('canvas-size-select').value = '256';
+      }
     }
 
-    // 2. Cargar modelo 3D activo (según género seleccionado)
-    const gender = document.querySelector('.model-btn.active')?.dataset.gender ?? 'male';
-    const modelPath = preset.models[gender];
-    if (modelPath) {
-      await this._loadModelFromPath(modelPath, gender, status);
-    } else if (status) {
-      status.textContent = '⚠ Modelo pendiente de añadir';
+    // 2. Cargar textura como capa de plantilla
+    if (status) status.textContent = '⏳ Cargando…';
+    await this._loadTextureAsTemplate(variant, cat.label);
+
+    // 3. Cambiar a género correcto en el visor
+    this._switchToGender(cat.gender);
+
+    // 4. Cargar el modelo si no está ya cargado
+    const modelPath = MODELS[cat.gender];
+    if (modelPath && !this._loadedModels.has(modelPath)) {
+      await this._loadModelFromPath(modelPath, cat.gender);
     }
 
-    bus.emit('preset-changed', preset);
+    // 5. Aplicar la textura también al modelo 3D como referencia
+    this._preview.setTemplateFromUrl(variant.file);
+
+    if (status) status.textContent = `✓ ${variant.label}`;
+    setTimeout(() => { if (status) status.textContent = ''; }, 2000);
+
+    bus.emit('preset-changed', { category: cat, variant });
   }
 
-  async _loadTemplateFromPath(path, preset) {
+  /* ── Carga de textura como template layer ─────────── */
+
+  async _loadTextureAsTemplate(variant, catLabel) {
     try {
-      const response = await fetch(path);
-      if (!response.ok) {
-        this._showTemplateNotFound(path);
-        return;
-      }
+      const response = await fetch(variant.file);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       const url  = URL.createObjectURL(blob);
-      const img  = new Image();
-      await new Promise((res, rej) => {
-        img.onload  = res;
-        img.onerror = rej;
-        img.src = url;
+
+      const img = await this._loadImg(url);
+      URL.revokeObjectURL(url);
+
+      // Eliminar templates anteriores
+      const templatesToRemove = this._layers._layers.filter(l => l.isTemplate);
+      templatesToRemove.forEach(() => {
+        const idx = this._layers._layers.findIndex(l => l.isTemplate);
+        if (idx >= 0) {
+          this._editor.canvas.remove(this._layers._layers[idx].fabricObj);
+          this._layers._layers.splice(idx, 1);
+        }
       });
+      this._editor.canvas.renderAll();
 
-      // Eliminar plantillas UV anteriores
-      this._layers._layers
-        .filter(l => l.isTemplate)
-        .forEach(() => this._layers.deleteActive());
+      // Añadir nueva plantilla
+      this._layers.addImageLayer(img, `${catLabel} — ${variant.label}`, true);
 
-      this._layers.addImageLayer(img, `Plantilla: ${preset.name}`, true);
-
-      // Añadir al selector de template del preview 3D
-      const sel = document.getElementById('template-select');
-      let opt = sel.querySelector(`option[data-preset="${preset.id}"]`);
-      if (!opt) {
-        opt = document.createElement('option');
-        opt.dataset.preset = preset.id;
-        sel.appendChild(opt);
-      }
-      opt.value       = url;
-      opt.textContent = `Plantilla: ${preset.name}`;
-      sel.value = url;
-      this._preview.setTemplate(url);
-
-    } catch (_) {
-      this._showTemplateNotFound(path);
+    } catch (err) {
+      console.warn(`[Presets] No se pudo cargar ${variant.file}:`, err.message);
+      const status = document.getElementById('preset-status');
+      if (status) status.textContent = '⚠ Plantilla no disponible';
     }
   }
 
-  async _loadModelFromPath(path, gender, statusEl) {
+  /* ── Auto-carga de modelos al arrancar ───────────── */
+
+  async _autoLoadBothModels() {
+    // Cargar ambos modelos en segundo plano para que el visor los tenga listos
+    for (const [gender, path] of Object.entries(MODELS)) {
+      await this._loadModelFromPath(path, gender);
+    }
+  }
+
+  async _loadModelFromPath(path, gender) {
     try {
       const response = await fetch(path);
-      if (!response.ok) {
-        if (statusEl) statusEl.textContent = `⚠ Modelo aún no disponible (${path})`;
-        return;
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       const file = new File([blob], path.split('/').pop(), { type: 'application/octet-stream' });
       this._preview.loadFBX(file, gender);
-    } catch (_) {
-      if (statusEl) statusEl.textContent = `⚠ No se encontró el modelo (${path.split('/').pop()})`;
+      this._loadedModels.add(path);
+    } catch (err) {
+      console.warn(`[Presets] No se pudo cargar modelo ${path}:`, err.message);
     }
   }
 
-  _showTemplateNotFound(path) {
-    console.warn(`[ClothingPresets] Plantilla no encontrada: ${path}`);
+  /* ── Cambiar género en el visor ──────────────────── */
+
+  _switchToGender(gender) {
+    // Actualizar botones UI
+    document.querySelectorAll('.model-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.gender === gender);
+    });
+    this._preview.setGender(gender);
   }
 
-  /** Cambiar género recarga el modelo del preset activo */
+  /* ── Cambio de género desde botones ♂/♀ ─────────── */
+
   onGenderChange(gender) {
-    if (!this._current) return;
-    const modelPath = this._current.models[gender];
-    if (modelPath) {
-      const statusEl = document.getElementById('preset-status');
-      this._loadModelFromPath(modelPath, gender, statusEl);
+    // Recargar modelo si no está cargado para este género
+    const path = MODELS[gender];
+    if (path && !this._loadedModels.has(path)) {
+      this._loadModelFromPath(path, gender);
+    } else {
+      this._preview.setGender(gender);
     }
+    // Recargar plantilla si la categoría activa cambia de género
+    if (this._currentCategory && this._currentCategory.gender !== gender) {
+      // Buscar categoría equivalente del otro género (human↔human, zombie↔zombie)
+      const isZombie  = this._currentCategory.id.includes('zombie');
+      const newCatId  = gender === 'male'
+        ? (isZombie ? 'malezombie' : 'male')
+        : (isZombie ? 'femalezombie' : 'female');
+      const newCat    = CATEGORIES.find(c => c.id === newCatId);
+      if (newCat) {
+        document.getElementById('preset-category').value = newCatId;
+        this._populateVariants(newCatId);
+        const first = newCat.variants[0];
+        document.getElementById('preset-variant').value = first.id;
+        this._applyVariant(newCatId, first.id);
+      }
+    }
+  }
+
+  /* ── Helper ──────────────────────────────────────── */
+
+  _loadImg(src) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload  = () => res(img);
+      img.onerror = () => rej(new Error('Error cargando imagen'));
+      img.src     = src;
+    });
   }
 }

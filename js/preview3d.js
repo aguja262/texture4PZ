@@ -163,6 +163,19 @@ export class Preview3D {
     }
   }
 
+  /* ── Apply template from URL ──────────────────────── */
+
+  setTemplateFromUrl(url) {
+    // Carga la textura desde una URL relativa y la aplica al modelo actual
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load(url, tex => {
+      tex.encoding     = THREE.sRGBEncoding;
+      tex.flipY        = false;
+      this._texture    = tex;
+      this._applyTextureToModel();
+    });
+  }
+
   /* ── Apply template overlay ───────────────────────── */
 
   setTemplate(src) {
