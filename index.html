@@ -346,6 +346,19 @@
         </div>
       </div>
 
+      <!-- Clothing presets section -->
+      <div id="presets-section">
+        <div class="panel-header">
+          <span>PRENDAS</span>
+          <span id="preset-status" style="font-size:9px;color:var(--warn)"></span>
+        </div>
+        <div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg-dark)">
+          <select id="preset-select" class="option-select" style="font-size:11px">
+            <!-- Populated by clothingPresets.js -->
+          </select>
+        </div>
+      </div>
+
       <!-- Layers section -->
       <div id="layers-section">
         <div class="panel-header">
@@ -451,54 +464,46 @@
     </div>
   </div>
 
-  <!-- Background Removal Modal -->
+  <!-- Background Removal Modal (nuevo diseño — canvas único) -->
   <div id="modal-bg-removal" class="modal-overlay hidden">
-    <div class="modal-box modal-box--wide">
+    <div class="modal-box" style="min-width:min(560px,96vw)">
       <div class="modal-header">
         <span>ELIMINAR FONDO CON IA</span>
-        <button class="modal-close-btn" data-close="modal-bg-removal">✕</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="bgr-spinner" class="spinner hidden" style="width:16px;height:16px;border-width:2px"></div>
+          <button class="modal-close-btn" data-close="modal-bg-removal">✕</button>
+        </div>
       </div>
-      <div class="modal-body">
-        <div id="bgr-panels">
-          <div class="bgr-panel">
-            <div class="bgr-panel-label">ORIGINAL</div>
-            <div class="bgr-canvas-wrap">
-              <canvas id="bgr-original"></canvas>
-            </div>
+      <div class="modal-body" style="padding:10px">
+
+        <!-- Canvas de edición único -->
+        <div id="bgr-canvas-wrap">
+          <canvas id="bgr-edit-canvas"></canvas>
+        </div>
+
+        <!-- Barra de herramientas de pintura -->
+        <div id="bgr-toolbar">
+          <div class="bgr-mode-group">
+            <button id="bgr-btn-erase" class="bgr-tool active">
+              <span class="bgr-tool-icon">◻</span> Borrar zona
+            </button>
+            <button id="bgr-btn-restore" class="bgr-tool">
+              <span class="bgr-tool-icon">◼</span> Restaurar zona
+            </button>
           </div>
-          <div class="bgr-panel">
-            <div class="bgr-panel-label">MÁSCARA (editable)</div>
-            <div class="bgr-canvas-wrap">
-              <canvas id="bgr-mask"></canvas>
-              <div id="bgr-processing" class="hidden">
-                <div class="spinner"></div>
-                <span>Procesando con IA…</span>
-                <small>Puede tardar 5–15 segundos la primera vez.</small>
-              </div>
-            </div>
-          </div>
-          <div class="bgr-panel">
-            <div class="bgr-panel-label">RESULTADO</div>
-            <div class="bgr-canvas-wrap checker-bg">
-              <canvas id="bgr-result"></canvas>
-            </div>
+          <div class="bgr-brush-group">
+            <label class="option-label" style="margin:0;white-space:nowrap">Pincel:</label>
+            <input type="range" id="bgr-brush-size" min="4" max="120" value="30" class="slider" style="width:90px">
+            <span id="bgr-brush-size-val" class="val-display">30px</span>
           </div>
         </div>
 
-        <div id="bgr-edit-toolbar">
-          <span class="option-label" style="margin:0">EDICIÓN MANUAL:</span>
-          <button class="bgr-tool active" id="bgr-brush-restore" title="Restaurar zona (pintar blanco en máscara)">+ Restaurar</button>
-          <button class="bgr-tool" id="bgr-brush-erase" title="Borrar zona (pintar negro en máscara)">− Borrar</button>
-          <div class="bgr-tool-spacer"></div>
-          <label class="option-label" style="margin:0">Radio:</label>
-          <input type="range" id="bgr-brush-size" min="2" max="100" value="20" class="slider" style="width:80px">
-          <span id="bgr-brush-size-val" class="val-display">20px</span>
-        </div>
-        <div id="bgr-status"></div>
+        <div id="bgr-hint" class="bgr-hint">Pinta sobre zonas que quieras ELIMINAR (dejarlas transparentes)</div>
+        <div id="bgr-status" class="bgr-status"></div>
       </div>
       <div class="modal-footer">
         <button id="bgr-cancel" class="option-btn">Cancelar</button>
-        <button id="bgr-apply" class="option-btn option-btn--accent" disabled>Añadir al canvas</button>
+        <button id="bgr-apply" class="option-btn option-btn--accent" disabled>✓ Añadir como capa</button>
       </div>
     </div>
   </div>
@@ -587,13 +592,63 @@
     </div>
   </div>
 
-  <!-- Context Menu -->
+  <!-- Scale Layer Modal -->
+  <div id="modal-scale-layer" class="modal-overlay hidden">
+    <div class="modal-box" style="min-width:300px">
+      <div class="modal-header">
+        <span>ESCALAR CAPA</span>
+        <button class="modal-close-btn" data-close="modal-scale-layer">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="option-label">ESCALA</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="range" id="scale-percent-slider" min="10" max="400" value="100" class="slider" style="flex:1">
+          <input type="number" id="scale-percent" value="100" min="1" max="2000" class="option-input" style="width:64px">
+          <span style="color:var(--text-mid);font-size:12px">%</span>
+        </div>
+
+        <label class="checkbox-label" style="margin-top:10px">
+          <input type="checkbox" id="scale-proportional" checked>
+          Proporcional (mantener relación de aspecto)
+        </label>
+
+        <div id="scale-px-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <div>
+            <label class="option-label">ANCHO (px)</label>
+            <input type="number" id="scale-width" class="option-input">
+          </div>
+          <div>
+            <label class="option-label">ALTO (px)</label>
+            <input type="number" id="scale-height" class="option-input">
+          </div>
+        </div>
+
+        <label class="option-label" style="margin-top:10px">POSICIÓN</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label class="option-label">X (px)</label>
+            <input type="number" id="scale-x" class="option-input" value="0">
+          </div>
+          <div>
+            <label class="option-label">Y (px)</label>
+            <input type="number" id="scale-y" class="option-input" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="scale-cancel" class="option-btn">Cancelar</button>
+        <button id="scale-apply" class="option-btn option-btn--accent">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="context-menu" class="context-menu hidden">
     <div class="ctx-item" data-action="duplicate">Duplicar capa</div>
     <div class="ctx-item" data-action="merge-down">Fusionar hacia abajo</div>
     <div class="ctx-sep"></div>
-    <div class="ctx-item" data-action="bg-remove">Quitar fondo (IA)</div>
-    <div class="ctx-item" data-action="apply-filters">Abrir filtros</div>
+    <div class="ctx-item" data-action="scale">↔ Escalar / Reposicionar capa</div>
+    <div class="ctx-item" data-action="bg-remove">🤖 Quitar fondo (IA)</div>
+    <div class="ctx-item" data-action="apply-filters">🎨 Abrir filtros</div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" data-action="rename">Renombrar capa</div>
     <div class="ctx-sep"></div>
