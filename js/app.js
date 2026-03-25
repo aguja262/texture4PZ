@@ -11,7 +11,6 @@ import { FileManager }     from './fileManager.js';
 import { BgRemoval }       from './bgRemoval.js';
 import { Filters }         from './filters.js';
 import { ColorPicker }     from './colorPicker.js';
-import { ClothingPresets } from './clothingPresets.js';
 
 /* ── Global state ─────────────────────────────────── */
 export const APP = {
@@ -46,7 +45,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   const bgRemoval   = new BgRemoval(editor, layers, APP);
   const filters     = new Filters(editor, layers, APP);
   const colorPicker = new ColorPicker(APP);
-  const presets     = new ClothingPresets(editor, layers, preview, files, APP);
+
+  let presets = null;
+  try {
+    const { ClothingPresets } = await import('./clothingPresets.js');
+    presets = new ClothingPresets(editor, layers, preview, files, APP);
+  } catch (e) {
+    console.error('[App] Error cargando ClothingPresets:', e);
+  }
 
   window._pze = { editor, layers, tools, preview, files, bgRemoval, filters, colorPicker, presets };
 
@@ -205,7 +211,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       btn.classList.add('active');
       const gender = btn.dataset.gender;
       preview.setGender(gender);
-      presets.onGenderChange(gender);   // recarga modelo del preset activo al cambiar género
+      presets?.onGenderChange(gender);
     });
   });
 
