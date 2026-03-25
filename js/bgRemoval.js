@@ -1,44 +1,35 @@
 /**
- * bgRemoval.js — Background Removal using @imgly/background-removal
- * Runs entirely in the browser via WASM — no API key, no server.
+ * bgRemoval.js — Borrado de fondo con IA
+ * UI: un solo canvas de edición con feedback visual intuitivo.
+ * - Modo BORRAR: imagen normal, pintar hace la zona transparente (tablero de ajedrez)
+ * - Modo RESTAURAR: imagen atenuada, pintar revela la zona con opacidad completa
  */
 
 import { bus } from './app.js';
 
-const BGS_CDN = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.js';
+const BGR_LIB_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.14/dist/browser/index.js';
+const BGR_PUBLIC  = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.14/dist/browser/';
 
 export class BgRemoval {
   constructor(editor, layers, appState) {
-    this._editor  = editor;
-    this._layers  = layers;
-    this._app     = appState;
-    this._lib     = null;
+    this._editor   = editor;
+    this._layers   = layers;
+    this._app      = appState;
+    this._removeBackground = null;
 
-    // Canvas references (set when modal opens)
-    this._origCanvas   = null;
-    this._maskCanvas   = null;
-    this._resultCanvas = null;
+    this._origCanvas = null;
+    this._maskCanvas = null;
+    this._editCanvas = null;
 
-    // Mask painting state
-    this._maskPainting  = false;
-    this._maskTool      = 'restore'; // 'restore' | 'erase'
-    this._maskBrushSize = 20;
+    this._painting  = false;
+    this._lastPos   = null;
+    this._tool      = 'erase';
+    this._brushSize = 30;
 
     this._bindUI();
   }
 
-  /* ── Load library on demand ───────────────────────── */
-
-  async _loadLib() {
-    if (this._lib) return this._lib;
-    this._setStatus('Cargando módulo IA (primera vez puede tardar)…');
-    const mod  = await import(/* @vite-ignore */ BGS_CDN);
-    this._lib  = mod;
-    this._setStatus('');
-    return mod;
-  }
-
-  /* ── Open modal ───────────────────────────────────── */
+  /* ── Abrir modal ────────────────────────────────── */
 
   async openModal() {
     const layer = this._layers.getActive();
@@ -47,194 +38,249 @@ export class BgRemoval {
     const modal = document.getElementById('modal-bg-removal');
     modal.classList.remove('hidden');
 
-    this._origCanvas   = document.getElementById('bgr-original');
-    this._maskCanvas   = document.getElementById('bgr-mask');
-    this._resultCanvas = document.getElementById('bgr-result');
-
-    // Render active layer to original canvas
     const w = this._app.canvasW;
     const h = this._app.canvasH;
-    [this._origCanvas, this._maskCanvas, this._resultCanvas].forEach(c => {
-      c.width = w; c.height = h;
-    });
 
-    // Draw active layer content
+    this._origCanvas = this._makeCanvas(w, h);
+    this._maskCanvas = this._makeCanvas(w, h);
+
+    const origCtx = this._origCanvas.getContext('2d');
     const fabricObj = layer.fabricObj;
-    const ctx = this._origCanvas.getContext('2d');
-    if (fabricObj.getElement?.()) {
-      ctx.drawImage(fabricObj.getElement(), 0, 0, w, h);
+    if (fabricObj?.getElement?.()) {
+      origCtx.drawImage(fabricObj.getElement(), 0, 0, w, h);
     } else {
-      const img = new Image();
-      img.src = this._editor.toDataURL({ format: 'png' });
-      await new Promise(r => { img.onload = r; });
-      ctx.drawImage(img, 0, 0);
+      await this._drawFromDataUrl(origCtx, this._editor.toDataURL({ format: 'png' }), w, h);
     }
 
-    // Clear mask & result
-    this._maskCanvas.getContext('2d').clearRect(0, 0, w, h);
-    this._resultCanvas.getContext('2d').clearRect(0, 0, w, h);
+    // Máscara inicial todo blanco = todo visible
+    const mCtx = this._maskCanvas.getContext('2d');
+    mCtx.fillStyle = '#ffffff';
+    mCtx.fillRect(0, 0, w, h);
 
+    this._editCanvas = document.getElementById('bgr-edit-canvas');
+    this._editCanvas.width  = w;
+    this._editCanvas.height = h;
+
+    this._tool = 'erase';
+    document.getElementById('bgr-btn-erase').classList.add('active');
+    document.getElementById('bgr-btn-restore').classList.remove('active');
+    document.getElementById('bgr-hint').textContent =
+      'Pinta sobre zonas que quieras eliminar (dejarlas transparentes)';
     document.getElementById('bgr-apply').disabled = true;
     this._setStatus('');
-
-    // Start processing
-    this._processRemoval();
-    this._bindMaskPainting();
+    this._renderEditCanvas();
+    this._bindPainting();
+    this._runAI();
   }
 
-  /* ── Run AI background removal ────────────────────── */
+  /* ── Proceso IA ─────────────────────────────────── */
 
-  async _processRemoval() {
-    const processing = document.getElementById('bgr-processing');
-    processing.classList.remove('hidden');
-    this._setStatus('');
+  async _runAI() {
+    const spinner = document.getElementById('bgr-spinner');
+    spinner.classList.remove('hidden');
+    this._setStatus('⏳ Cargando módulo de IA (primera vez puede tardar 10-20 s)…', 'loading');
 
     try {
-      const lib = await this._loadLib();
+      if (!this._removeBackground) {
+        const mod = await import(BGR_LIB_URL);
+        this._removeBackground = mod.removeBackground ?? mod.default?.removeBackground;
+        if (!this._removeBackground) throw new Error('Función removeBackground no encontrada en el módulo.');
+      }
 
-      // Convert canvas to blob
-      const blob = await canvasToBlob(this._origCanvas);
+      this._setStatus('🤖 Procesando con IA…', 'loading');
 
-      const resultBlob = await lib.removeBackground(blob, {
-        publicPath: `https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/`,
-        model:      'medium',
-        output: { format: 'image/png', quality: 0.8, type: 'foreground' },
+      const blob = await new Promise(res => this._origCanvas.toBlob(res, 'image/png'));
+      const resultBlob = await this._removeBackground(blob, {
+        publicPath: BGR_PUBLIC,
+        model: 'medium',
+        output: { format: 'image/png', quality: 0.9, type: 'foreground' },
       });
 
-      // Draw result
-      const url = URL.createObjectURL(resultBlob);
-      const img = new Image();
-      img.onload = () => {
-        const w = this._app.canvasW, h = this._app.canvasH;
-        // Draw result on result canvas
-        const rCtx = this._resultCanvas.getContext('2d');
-        rCtx.clearRect(0, 0, w, h);
-        rCtx.drawImage(img, 0, 0, w, h);
+      // Extraer canal alpha del resultado → máscara B/N
+      const resultImg = await this._loadImageFromBlob(resultBlob);
+      const tmp  = this._makeCanvas(this._origCanvas.width, this._origCanvas.height);
+      const tCtx = tmp.getContext('2d');
+      tCtx.drawImage(resultImg, 0, 0, tmp.width, tmp.height);
 
-        // Build mask: where alpha > 0 → white, else black
-        const mCtx  = this._maskCanvas.getContext('2d');
-        const iData = rCtx.getImageData(0, 0, w, h);
-        const mask  = new ImageData(w, h);
-        for (let i = 0; i < iData.data.length; i+=4) {
-          const v = iData.data[i+3] > 10 ? 255 : 0;
-          mask.data[i]=mask.data[i+1]=mask.data[i+2]=v;
-          mask.data[i+3]=255;
-        }
-        mCtx.putImageData(mask, 0, 0);
+      const rData = tCtx.getImageData(0, 0, tmp.width, tmp.height);
+      const mCtx  = this._maskCanvas.getContext('2d');
+      const mData = mCtx.getImageData(0, 0, tmp.width, tmp.height);
 
-        URL.revokeObjectURL(url);
-        processing.classList.add('hidden');
-        document.getElementById('bgr-apply').disabled = false;
-        this._setStatus('✓ IA completada. Edita la máscara si es necesario.');
-      };
-      img.src = url;
+      for (let i = 0; i < rData.data.length; i += 4) {
+        const v = rData.data[i + 3]; // alpha → luminosidad máscara
+        mData.data[i] = mData.data[i+1] = mData.data[i+2] = v;
+        mData.data[i + 3] = 255;
+      }
+      mCtx.putImageData(mData, 0, 0);
+
+      spinner.classList.add('hidden');
+      this._renderEditCanvas();
+      document.getElementById('bgr-apply').disabled = false;
+      this._setStatus('✓ IA lista. Pinta sobre la imagen para corregir errores.', 'ok');
 
     } catch (err) {
-      processing.classList.add('hidden');
-      this._setStatus(`⚠ Error: ${err.message}. Puede que el modelo no haya cargado aún.`);
+      spinner.classList.add('hidden');
+      document.getElementById('bgr-apply').disabled = false;
+      this._setStatus(`⚠ Error IA: ${err.message}. Puedes pintar la máscara manualmente.`, 'error');
       console.error('[BgRemoval]', err);
     }
   }
 
-  /* ── Apply result to canvas ───────────────────────── */
+  /* ── Render canvas de edición ───────────────────── */
 
-  _applyToCanvas() {
-    const w = this._app.canvasW, h = this._app.canvasH;
+  _renderEditCanvas() {
+    const ec = this._editCanvas;
+    if (!ec || !this._origCanvas) return;
+    const w   = ec.width, h = ec.height;
+    const ctx = ec.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
 
-    // Composite: original * mask alpha
-    const final = document.createElement('canvas');
-    final.width = w; final.height = h;
-    const ctx   = final.getContext('2d');
+    // Fondo: tablero de ajedrez (siempre visible como indicador de transparencia)
+    this._drawChecker(ctx, w, h);
 
-    const origData = this._origCanvas.getContext('2d').getImageData(0, 0, w, h);
-    const maskData = this._maskCanvas.getContext('2d').getImageData(0, 0, w, h);
-    const out      = new ImageData(w, h);
+    if (this._tool === 'erase') {
+      // Modo BORRAR: imagen visible donde la máscara es blanca, transparencia donde es negra
+      const tmp  = this._makeCanvas(w, h);
+      const tCtx = tmp.getContext('2d');
+      tCtx.drawImage(this._origCanvas, 0, 0);
+      tCtx.globalCompositeOperation = 'destination-in';
+      tCtx.drawImage(this._maskCanvas, 0, 0);
+      ctx.drawImage(tmp, 0, 0);
 
-    for (let i = 0; i < origData.data.length; i+=4) {
-      // Mask brightness as alpha
-      const alpha = maskData.data[i]; // R channel of mask (0 or 255)
-      out.data[i]   = origData.data[i];
-      out.data[i+1] = origData.data[i+1];
-      out.data[i+2] = origData.data[i+2];
-      out.data[i+3] = alpha;
+    } else {
+      // Modo RESTAURAR: imagen oscurecida + imagen normal donde la máscara es blanca
+      // 1. Imagen completa, muy atenuada
+      const dim = this._makeCanvas(w, h);
+      const dCtx = dim.getContext('2d');
+      dCtx.drawImage(this._origCanvas, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.drawImage(dim, 0, 0);
+      ctx.restore();
+
+      // 2. Imagen normal donde la máscara es blanca (lo que se conservará)
+      const tmp  = this._makeCanvas(w, h);
+      const tCtx = tmp.getContext('2d');
+      tCtx.drawImage(this._origCanvas, 0, 0);
+      tCtx.globalCompositeOperation = 'destination-in';
+      tCtx.drawImage(this._maskCanvas, 0, 0);
+      ctx.drawImage(tmp, 0, 0);
     }
-    ctx.putImageData(out, 0, 0);
-
-    // Add as new layer
-    const imgEl = new Image();
-    imgEl.onload = () => {
-      this._layers.addImageLayer(imgEl, 'Sin fondo');
-      document.getElementById('modal-bg-removal').classList.add('hidden');
-    };
-    imgEl.src = final.toDataURL('image/png');
   }
 
-  /* ── Mask painting ────────────────────────────────── */
+  /* ── Pintura sobre la máscara ───────────────────── */
 
-  _bindMaskPainting() {
-    const mCanvas = this._maskCanvas;
-    const ctx     = mCanvas.getContext('2d');
+  _bindPainting() {
+    const ec = this._editCanvas;
+    const newEc = ec.cloneNode(true);
+    ec.parentNode.replaceChild(newEc, ec);
+    this._editCanvas = newEc;
 
     const getPos = e => {
-      const rect  = mCanvas.getBoundingClientRect();
-      const scaleX = mCanvas.width  / rect.width;
-      const scaleY = mCanvas.height / rect.height;
-      const src = e.touches?.[0] || e;
+      const rect   = newEc.getBoundingClientRect();
+      const scaleX = newEc.width  / rect.width;
+      const scaleY = newEc.height / rect.height;
+      const src    = e.touches?.[0] ?? e;
       return {
         x: (src.clientX - rect.left) * scaleX,
         y: (src.clientY - rect.top)  * scaleY,
       };
     };
 
-    const paint = e => {
-      if (!this._maskPainting) return;
-      const { x, y } = getPos(e);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = this._maskTool === 'restore' ? '#ffffff' : '#000000';
-      ctx.beginPath();
-      ctx.arc(x, y, this._maskBrushSize / 2, 0, Math.PI*2);
-      ctx.fill();
-      this._updateResult();
+    const startPaint = e => {
+      e.preventDefault();
+      this._painting = true;
+      this._lastPos  = getPos(e);
+      this._paintAt(this._lastPos.x, this._lastPos.y, null);
     };
 
-    mCanvas.addEventListener('mousedown', e => { this._maskPainting = true; paint(e); });
-    mCanvas.addEventListener('mousemove', paint);
-    mCanvas.addEventListener('mouseup',   () => { this._maskPainting = false; });
-    mCanvas.addEventListener('mouseleave',() => { this._maskPainting = false; });
+    const movePaint = e => {
+      if (!this._painting) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      this._paintAt(pos.x, pos.y, this._lastPos);
+      this._lastPos = pos;
+    };
+
+    const endPaint = () => { this._painting = false; this._lastPos = null; };
+
+    newEc.addEventListener('mousedown',  startPaint, { passive: false });
+    newEc.addEventListener('mousemove',  movePaint,  { passive: false });
+    newEc.addEventListener('mouseup',    endPaint);
+    newEc.addEventListener('mouseleave', endPaint);
+    newEc.addEventListener('touchstart', startPaint, { passive: false });
+    newEc.addEventListener('touchmove',  movePaint,  { passive: false });
+    newEc.addEventListener('touchend',   endPaint);
   }
 
-  _updateResult() {
-    const w = this._app.canvasW, h = this._app.canvasH;
-    const origData = this._origCanvas.getContext('2d').getImageData(0, 0, w, h);
-    const maskData = this._maskCanvas.getContext('2d').getImageData(0, 0, w, h);
-    const out = new ImageData(w, h);
-    for (let i = 0; i < origData.data.length; i+=4) {
-      out.data[i]   = origData.data[i];
-      out.data[i+1] = origData.data[i+1];
-      out.data[i+2] = origData.data[i+2];
-      out.data[i+3] = maskData.data[i];
+  /**
+   * Pinta en la máscara con trazado continuo (evita el efecto "punteado").
+   * Usa lineTo desde la posición anterior a la actual.
+   */
+  _paintAt(x, y, lastPos) {
+    const mCtx       = this._maskCanvas.getContext('2d');
+    mCtx.lineWidth   = this._brushSize;
+    mCtx.lineCap     = 'round';
+    mCtx.lineJoin    = 'round';
+    const color      = this._tool === 'erase' ? '#000000' : '#ffffff';
+    mCtx.strokeStyle = color;
+    mCtx.fillStyle   = color;
+
+    mCtx.beginPath();
+    if (lastPos && (Math.abs(x - lastPos.x) + Math.abs(y - lastPos.y)) < this._brushSize * 4) {
+      // Línea continua desde la posición anterior
+      mCtx.moveTo(lastPos.x, lastPos.y);
+      mCtx.lineTo(x, y);
+      mCtx.stroke();
+    } else {
+      // Punto inicial o salto grande: círculo
+      mCtx.arc(x, y, this._brushSize / 2, 0, Math.PI * 2);
+      mCtx.fill();
     }
-    const rCtx = this._resultCanvas.getContext('2d');
-    rCtx.clearRect(0, 0, w, h);
-    rCtx.putImageData(out, 0, 0);
+
+    this._renderEditCanvas();
   }
 
-  /* ── UI bindings ──────────────────────────────────── */
+  /* ── Aplicar resultado al canvas ────────────────── */
+
+  _applyToCanvas() {
+    const w     = this._app.canvasW, h = this._app.canvasH;
+    const final = this._makeCanvas(w, h);
+    const ctx   = final.getContext('2d');
+
+    ctx.drawImage(this._origCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(this._maskCanvas, 0, 0);
+
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      this._layers.addImageLayer(imgEl, 'Sin fondo (IA)');
+      document.getElementById('modal-bg-removal').classList.add('hidden');
+    };
+    imgEl.src = final.toDataURL('image/png');
+  }
+
+  /* ── Bindings UI ─────────────────────────────────── */
 
   _bindUI() {
-    document.getElementById('bgr-brush-restore')?.addEventListener('click', e => {
-      this._maskTool = 'restore';
-      document.getElementById('bgr-brush-restore').classList.add('active');
-      document.getElementById('bgr-brush-erase').classList.remove('active');
+    document.getElementById('bgr-btn-erase')?.addEventListener('click', () => {
+      this._tool = 'erase';
+      document.getElementById('bgr-btn-erase').classList.add('active');
+      document.getElementById('bgr-btn-restore').classList.remove('active');
+      document.getElementById('bgr-hint').textContent =
+        'Pinta sobre zonas que quieras ELIMINAR (dejarlas transparentes)';
+      this._renderEditCanvas();
     });
-    document.getElementById('bgr-brush-erase')?.addEventListener('click', () => {
-      this._maskTool = 'erase';
-      document.getElementById('bgr-brush-erase').classList.add('active');
-      document.getElementById('bgr-brush-restore').classList.remove('active');
+    document.getElementById('bgr-btn-restore')?.addEventListener('click', () => {
+      this._tool = 'restore';
+      document.getElementById('bgr-btn-restore').classList.add('active');
+      document.getElementById('bgr-btn-erase').classList.remove('active');
+      document.getElementById('bgr-hint').textContent =
+        'Pinta sobre zonas que quieras RECUPERAR (hacerlas visibles)';
+      this._renderEditCanvas();
     });
-    const sizeSlider = document.getElementById('bgr-brush-size');
-    sizeSlider?.addEventListener('input', e => {
-      this._maskBrushSize = parseInt(e.target.value);
+    document.getElementById('bgr-brush-size')?.addEventListener('input', e => {
+      this._brushSize = parseInt(e.target.value);
       document.getElementById('bgr-brush-size-val').textContent = e.target.value + 'px';
     });
     document.getElementById('bgr-apply')?.addEventListener('click', () => this._applyToCanvas());
@@ -243,14 +289,44 @@ export class BgRemoval {
     });
   }
 
-  _setStatus(msg) {
+  _setStatus(msg, type = '') {
     const el = document.getElementById('bgr-status');
-    if (el) el.textContent = msg;
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'bgr-status' + (type ? ` bgr-status--${type}` : '');
   }
-}
 
-/* ── Helper ─────────────────────────────────────────── */
+  _makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
 
-function canvasToBlob(canvas) {
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  _drawChecker(ctx, w, h) {
+    const s = 10;
+    for (let y = 0; y < h; y += s) {
+      for (let x = 0; x < w; x += s) {
+        ctx.fillStyle = ((Math.floor(y/s) + Math.floor(x/s)) % 2 === 0) ? '#c0c0c0' : '#888';
+        ctx.fillRect(x, y, s, s);
+      }
+    }
+  }
+
+  _loadImageFromBlob(blob) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload  = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Error cargando imagen resultado')); };
+      img.src = url;
+    });
+  }
+
+  _drawFromDataUrl(ctx, dataUrl, w, h) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, w, h); res(); };
+      img.src = dataUrl;
+    });
+  }
 }

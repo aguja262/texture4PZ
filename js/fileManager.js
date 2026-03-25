@@ -54,9 +54,12 @@ export class FileManager {
     const ext = file.name.split('.').pop().toLowerCase();
 
     if (ext === 'fbx') {
-      // Determine gender from filename heuristic
-      const gender = /female|mujer|woman|f_/i.test(file.name) ? 'female' : 'male';
+      // Usa el botón de género actualmente seleccionado en la UI
+      // (si el usuario ha pulsado ♀ antes de cargar, se asigna a mujer; si pulsó ♂, a hombre)
+      const activeBtn = document.querySelector('.model-btn.active');
+      const gender    = activeBtn?.dataset.gender ?? 'male';
       this._preview.loadFBX(file, gender);
+      console.log(`[FileManager] Modelo cargado como: ${gender}`);
     } else if (ext === 'x') {
       // .X format: offer Blender conversion script
       this._handleXFormat(file);

@@ -3,14 +3,15 @@
  * Entry point: initialises all modules and wires up global events / keyboard shortcuts.
  */
 
-import { Editor }      from './editor.js';
-import { LayerManager } from './layers.js';
-import { ToolManager }  from './tools.js';
-import { Preview3D }    from './preview3d.js';
-import { FileManager }  from './fileManager.js';
-import { BgRemoval }    from './bgRemoval.js';
-import { Filters }      from './filters.js';
-import { ColorPicker }  from './colorPicker.js';
+import { Editor }          from './editor.js';
+import { LayerManager }    from './layers.js';
+import { ToolManager }     from './tools.js';
+import { Preview3D }       from './preview3d.js';
+import { FileManager }     from './fileManager.js';
+import { BgRemoval }       from './bgRemoval.js';
+import { Filters }         from './filters.js';
+import { ColorPicker }     from './colorPicker.js';
+import { ClothingPresets } from './clothingPresets.js';
 
 /* ── Global state ─────────────────────────────────── */
 export const APP = {
@@ -45,9 +46,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   const bgRemoval   = new BgRemoval(editor, layers, APP);
   const filters     = new Filters(editor, layers, APP);
   const colorPicker = new ColorPicker(APP);
+  const presets     = new ClothingPresets(editor, layers, preview, files, APP);
 
-  /* Expose globally for debug */
-  window._pze = { editor, layers, tools, preview, files, bgRemoval, filters, colorPicker };
+  window._pze = { editor, layers, tools, preview, files, bgRemoval, filters, colorPicker, presets };
 
   /* ── Wire toolbar buttons ─────────────────────── */
   $('btn-new').addEventListener('click', () => showModal('modal-new-project'));
@@ -202,9 +203,100 @@ window.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      preview.setGender(btn.dataset.gender);
+      const gender = btn.dataset.gender;
+      preview.setGender(gender);
+      presets.onGenderChange(gender);   // recarga modelo del preset activo al cambiar género
     });
   });
+
+  /* ── Scale layer modal ───────────────────────────── */
+  {
+    const pSlider = $('scale-percent-slider');
+    const pInput  = $('scale-percent');
+    const wInput  = $('scale-width');
+    const hInput  = $('scale-height');
+    const xInput  = $('scale-x');
+    const yInput  = $('scale-y');
+    const propChk = $('scale-proportional');
+
+    // Función para abrir el modal con valores actuales de la capa
+    const openScaleModal = () => {
+      const layer = layers.getActive();
+      if (!layer?.fabricObj) { alert('Selecciona una capa primero.'); return; }
+      const fo  = layer.fabricObj;
+      const cW  = Math.round((fo.width  || APP.canvasW) * (fo.scaleX || 1));
+      const cH  = Math.round((fo.height || APP.canvasH) * (fo.scaleY || 1));
+      pSlider.value = 100;
+      pInput.value  = 100;
+      wInput.value  = cW;
+      hInput.value  = cH;
+      xInput.value  = Math.round(fo.left || 0);
+      yInput.value  = Math.round(fo.top  || 0);
+      showModal('modal-scale-layer');
+    };
+
+    // Sincronizar slider ↔ input de porcentaje
+    const syncPercent = val => {
+      pSlider.value = val;
+      pInput.value  = val;
+      const layer = layers.getActive();
+      if (!layer?.fabricObj) return;
+      const fo = layer.fabricObj;
+      const origW = Math.round((fo.width  || APP.canvasW) * (fo.scaleX || 1));
+      const origH = Math.round((fo.height || APP.canvasH) * (fo.scaleY || 1));
+      wInput.value = Math.round(origW * val / 100);
+      hInput.value = Math.round(origH * val / 100);
+    };
+    pSlider.addEventListener('input',  e => syncPercent(e.target.value));
+    pInput.addEventListener('change',  e => syncPercent(e.target.value));
+
+    // Sincronizar ancho ↔ alto (proporcional)
+    wInput.addEventListener('change', e => {
+      if (!propChk.checked) return;
+      const layer = layers.getActive();
+      if (!layer?.fabricObj) return;
+      const fo = layer.fabricObj;
+      const origW = (fo.width  || APP.canvasW) * (fo.scaleX || 1);
+      const origH = (fo.height || APP.canvasH) * (fo.scaleY || 1);
+      const newW = parseInt(e.target.value);
+      hInput.value = Math.round(newW * (origH / origW));
+    });
+    hInput.addEventListener('change', e => {
+      if (!propChk.checked) return;
+      const layer = layers.getActive();
+      if (!layer?.fabricObj) return;
+      const fo = layer.fabricObj;
+      const origW = (fo.width  || APP.canvasW) * (fo.scaleX || 1);
+      const origH = (fo.height || APP.canvasH) * (fo.scaleY || 1);
+      const newH = parseInt(e.target.value);
+      wInput.value = Math.round(newH * (origW / origH));
+    });
+
+    $('scale-cancel').addEventListener('click', () => hideModal('modal-scale-layer'));
+    $('scale-apply').addEventListener('click', () => {
+      const layer = layers.getActive();
+      if (!layer?.fabricObj) return;
+      const fo   = layer.fabricObj;
+      const newW = parseInt(wInput.value) || 1;
+      const newH = parseInt(hInput.value) || 1;
+      const newX = parseInt(xInput.value) || 0;
+      const newY = parseInt(yInput.value) || 0;
+      fo.set({
+        scaleX: newW / (fo.width  || APP.canvasW),
+        scaleY: newH / (fo.height || APP.canvasH),
+        left:   newX,
+        top:    newY,
+      });
+      fo.setCoords();
+      editor.canvas.renderAll();
+      editor._saveState();
+      bus.emit('canvas-changed');
+      hideModal('modal-scale-layer');
+    });
+
+    // Exponer para el context menu
+    window._openScaleModal = openScaleModal;
+  }
   $('template-select').addEventListener('change', e => preview.setTemplate(e.target.value));
 
   /* ── Import font ─────────────────────────────── */
@@ -374,6 +466,7 @@ function setupContextMenu(layers, bgRemoval, filters) {
       switch (item.dataset.action) {
         case 'duplicate':    layers.duplicateActive(); break;
         case 'merge-down':   layers.mergeDown(); break;
+        case 'scale':        window._openScaleModal?.(); break;
         case 'bg-remove':    bgRemoval.openModal(); break;
         case 'apply-filters':document.getElementById('filter-brightness').closest('.filter-section')
                                .scrollIntoView({ behavior: 'smooth' }); break;

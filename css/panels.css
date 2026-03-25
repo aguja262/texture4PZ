@@ -103,6 +103,21 @@
   font-size: 11px;
 }
 
+/* ═══ PRENDAS SECTION ════════════════════ */
+#presets-section {
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#presets-section .panel-header {
+  /* Inherits panel-header styles from main.css */
+}
+#preset-status {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
 /* ═══ LAYERS SECTION ════════════════════ */
 #layers-section {
   flex: 1;
